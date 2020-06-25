@@ -1,0 +1,17 @@
+.DS_Store
+.editorconfig
+.env
+LICENSE
+
+.history/**
+.nyc_output/**
+coverage/**
+
+*.log
+*.md
+*.svg
+*.png
+*ignore
+
+package-lock.json
+yarn.lock

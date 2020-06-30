@@ -10,7 +10,7 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const server = new Server({ debug: true, port });
     await server.listen();
     let client = new Client({ host: 'localhost', port, debug: true, prefix: 'lock:' });
-    let lockId = await client.lock('goods-1,goods-2', 5000);
+    let lockId = await client.lock('goods-1|goods-2', 5000);
     let expiredAt = await client.extend(lockId, 1000);
     assert(typeof expiredAt === 'number');
     console.log('new expiredAt', expiredAt);
@@ -25,7 +25,7 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const server = new Server({ debug: true, port });
     await server.listen();
     let client = new Client({ host: 'localhost', port, debug: true, prefix: 'lock:' });
-    let lockId = await client.lock('goods-1,goods-2', 5000);
+    let lockId = await client.lock('goods-1|goods-2', 5000);
     await server.close();
     await delay(2000);
     client.extend(lockId, 1000).then(

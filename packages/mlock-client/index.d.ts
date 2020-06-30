@@ -36,7 +36,7 @@ export default class Client {
 
   /**
    * 上锁，上锁成功后返回锁ID
-   * @param {string} resource
+   * @param {string} resource 资源描述字符串，同时锁定多个资源用 | 分隔
    * @param {number} [ttl]
    * @param {number} [timeout]
    * @param {number} [tolerate]

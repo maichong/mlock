@@ -46,8 +46,8 @@ export default class Client {
     }
 
     const { host = 'localhost', port, prefix } = this.options;
-    if (prefix?.includes(',') || prefix?.includes(' ')) {
-      throw new Error('prefix can not includes "," or " "');
+    if (prefix?.includes('|') || prefix?.includes(' ')) {
+      throw new Error('prefix can not includes "|" or " "');
     }
 
     let key = `${host}:${port}`;
@@ -68,11 +68,11 @@ export default class Client {
     if (resource.includes(' ')) throw new Error('resource can not includes " "');
     await this.socket.connect();
     if (this.options.prefix) {
-      if (resource.includes(',')) {
+      if (resource.includes('|')) {
         resource = resource
-          .split(',')
+          .split('|')
           .map((r) => this.options.prefix + r)
-          .join(',');
+          .join('|');
       } else {
         resource = this.options.prefix + resource;
       }

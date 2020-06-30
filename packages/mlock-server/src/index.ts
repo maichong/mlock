@@ -273,7 +273,7 @@ export default class Server {
 
     let lockId = now.toString(16) + Math.random().toString(16).substr(2);
 
-    let resources = resource.split(',');
+    let resources = resource.split('|');
 
     this.serverStatus.lockCount += 1;
     let lock: Lock = {

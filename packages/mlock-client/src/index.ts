@@ -18,22 +18,38 @@ export default class Client {
     this.clientId = generateId();
     this.lockCallbacks = Object.create(null);
     let socketId: string;
-    let host: string;
-    let port: number;
+    let url: URL;
+
     if (typeof options === 'string') {
-      let url = new URL(options);
-      host = url.hostname;
-      port = parseInt(url.port) || 12340;
-      this.options = { host, port };
+      url = new URL(options);
+      this.options = {};
     } else {
-      if (options.prefix?.includes(',') || options.prefix?.includes(' ')) {
-        throw new Error('prefix can not includes "," or " "');
-      }
       this.options = options;
+      if (options.uri) {
+        url = new URL(options.uri);
+      }
       socketId = options.socketId;
-      host = options.host;
-      port = options.port || 12340;
     }
+
+    if (url) {
+      this.options.host = url.hostname;
+      this.options.port = parseInt(url.port) || 12340;
+      if (parseInt(url.searchParams.get('timeout'))) {
+        this.options.timeout = parseInt(url.searchParams.get('timeout'));
+      }
+      if (parseInt(url.searchParams.get('tolerate'))) {
+        this.options.tolerate = parseInt(url.searchParams.get('tolerate'));
+      }
+      if (url.searchParams.get('prefix')) {
+        this.options.prefix = url.searchParams.get('prefix');
+      }
+    }
+
+    const { host = 'localhost', port, prefix } = this.options;
+    if (prefix?.includes(',') || prefix?.includes(' ')) {
+      throw new Error('prefix can not includes "," or " "');
+    }
+
     let key = `${host}:${port}`;
     if (!pool[key]) {
       pool[key] = new MultiplexSocket(host, port, socketId, this.options.debug);
@@ -42,7 +58,10 @@ export default class Client {
     this.socket.addClient(this);
   }
 
-  async lock(resource: string, ttl: number, timeout?: number, tolerate?: number): Promise<string> {
+  async lock(resource: string, ttl?: number, timeout?: number, tolerate?: number): Promise<string> {
+    if (ttl === undefined) {
+      ttl = this.options.ttl;
+    }
     if (this.options.debug) {
       console.log(`try to lock ${resource} ttl:${ttl}`);
     }
@@ -58,6 +77,12 @@ export default class Client {
         resource = this.options.prefix + resource;
       }
     }
+    if (timeout === undefined) {
+      timeout = this.options.timeout;
+    }
+    if (tolerate === undefined) {
+      tolerate = this.options.tolerate;
+    }
     let lockId = await this.socket.lock(this, resource, ttl, timeout, tolerate);
     await new Promise((resolve, reject) => {
       this.lockCallbacks[lockId] = (error?: Error) => {
@@ -68,12 +93,15 @@ export default class Client {
     return lockId;
   }
 
-  async extend(lockId: string, ttl: number): Promise<void> {
+  async extend(lockId: string, ttl?: number): Promise<number> {
+    if (ttl === undefined) {
+      ttl = this.options.ttl;
+    }
     if (this.options.debug) {
       console.log(`try to extend ${lockId} ttl:${ttl}`);
     }
     await this.socket.connect();
-    await this.socket.extend(lockId, ttl);
+    return await this.socket.extend(lockId, ttl);
   }
 
   async unlock(lockId: string): Promise<void> {
@@ -310,8 +338,9 @@ class MultiplexSocket extends events.EventEmitter {
     return lockId;
   }
 
-  extend(lockId: string, ttl: number) {
-    return this.send('extend', [lockId, ttl]);
+  async extend(lockId: string, ttl: number): Promise<number> {
+    let result = await this.send('extend', [lockId, ttl]);
+    return parseInt(result);
   }
 
   unlock(lockId: string) {

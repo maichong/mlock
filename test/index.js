@@ -1,3 +1,4 @@
+const assert = require('assert');
 const Server = require('../packages/mlock-server').default;
 const Client = require('../packages/mlock-client').default;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -10,7 +11,9 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await server.listen();
     let client = new Client({ host: 'localhost', port, debug: true, prefix: 'lock:' });
     let lockId = await client.lock('goods-1,goods-2', 5000);
-    await client.extend(lockId, 1000);
+    let expiredAt = await client.extend(lockId, 1000);
+    assert(typeof expiredAt === 'number');
+    console.log('new expiredAt', expiredAt);
     await client.unlock(lockId);
     client.destroy();
     await server.close();

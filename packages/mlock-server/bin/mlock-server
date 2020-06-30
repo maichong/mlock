@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+
+process.title = 'mlock-server';
+
+const port = parseInt(process.argv[2]) || 12340;
+
+const Server = require('../lib/index').default;
+
+const server = new Server({ port });
+
+server.listen().then(
+  () => {
+    console.log('listened on', port);
+  },
+  (e) => {
+    console.error(e.message);
+  }
+);

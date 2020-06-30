@@ -2,9 +2,11 @@ export interface ClientOptions {
   socketId?: string;
   host: string;
   port?: number;
+  prefix?: string;
+  debug?: boolean;
 }
 
-export default class LockClient {
+export default class Client {
   constructor(options: string | ClientOptions);
 
   lock(resource: string, ttl: number, timeout?: number, tolerate?: number): Promise<string>;

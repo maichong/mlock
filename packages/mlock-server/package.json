@@ -5,7 +5,11 @@
   "author": "Liang <liang@maichong.it> (https://github.com/liangxingchen)",
   "homepage": "https://github.com/maichong/mlock/tree/master/packages/mlock-server#readme",
   "license": "MIT",
-  "main": "lib/mlock-server.js",
+  "bin": {
+    "alaska": "bin/mlock-server"
+  },
+  "main": "lib/index.js",
+  "types": "index.d.ts",
   "files": [
     "lib"
   ],

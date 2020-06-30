@@ -8,10 +8,11 @@ const pool: {
   [key: string]: MultiplexSocket;
 } = Object.create(null);
 
-export default class LockClient {
+export default class Client {
   clientId: string;
   socket: MultiplexSocket;
   lockCallbacks: { [key: string]: Function };
+  options: ClientOptions;
 
   constructor(options: string | ClientOptions) {
     this.clientId = generateId();
@@ -23,21 +24,40 @@ export default class LockClient {
       let url = new URL(options);
       host = url.hostname;
       port = parseInt(url.port) || 12340;
+      this.options = { host, port };
     } else {
+      if (options.prefix?.includes(',') || options.prefix?.includes(' ')) {
+        throw new Error('prefix can not includes "," or " "');
+      }
+      this.options = options;
       socketId = options.socketId;
       host = options.host;
       port = options.port || 12340;
     }
     let key = `${host}:${port}`;
     if (!pool[key]) {
-      pool[key] = new MultiplexSocket(host, port, socketId);
+      pool[key] = new MultiplexSocket(host, port, socketId, this.options.debug);
     }
     this.socket = pool[key];
     this.socket.addClient(this);
   }
 
   async lock(resource: string, ttl: number, timeout?: number, tolerate?: number): Promise<string> {
+    if (this.options.debug) {
+      console.log(`try to lock ${resource} ttl:${ttl}`);
+    }
+    if (resource.includes(' ')) throw new Error('resource can not includes " "');
     await this.socket.connect();
+    if (this.options.prefix) {
+      if (resource.includes(',')) {
+        resource = resource
+          .split(',')
+          .map((r) => this.options.prefix + r)
+          .join(',');
+      } else {
+        resource = this.options.prefix + resource;
+      }
+    }
     let lockId = await this.socket.lock(this, resource, ttl, timeout, tolerate);
     await new Promise((resolve, reject) => {
       this.lockCallbacks[lockId] = (error?: Error) => {
@@ -49,11 +69,17 @@ export default class LockClient {
   }
 
   async extend(lockId: string, ttl: number): Promise<void> {
+    if (this.options.debug) {
+      console.log(`try to extend ${lockId} ttl:${ttl}`);
+    }
     await this.socket.connect();
     await this.socket.extend(lockId, ttl);
   }
 
   async unlock(lockId: string): Promise<void> {
+    if (this.options.debug) {
+      console.log(`try to unlock ${lockId}`);
+    }
     await this.socket.connect();
     await this.socket.unlock(lockId);
   }
@@ -71,24 +97,26 @@ class MultiplexSocket extends events.EventEmitter {
   id: string;
   host: string;
   port: number;
+  debug: boolean;
   buffer: PacketWrapper;
   socket: net.Socket;
   _onConnect: () => void;
   _onError: (e: Error) => void;
   _waitConnect: Promise<void>;
-  clients: LockClient[];
+  clients: Client[];
   retry: number;
   callbacks: {
     [requestId: string]: Function;
   };
   locks: {
-    [lockId: string]: LockClient;
+    [lockId: string]: Client;
   };
 
-  constructor(host: string, port: number, id?: string) {
+  constructor(host: string, port: number, id?: string, debug?: boolean) {
     super();
     this.host = host;
     this.port = port;
+    this.debug = debug;
     this.id = id || generateId();
     this.callbacks = Object.create(null);
     this.locks = Object.create(null);
@@ -108,9 +136,12 @@ class MultiplexSocket extends events.EventEmitter {
   }
 
   _connect() {
+    if (this.debug) {
+      console.log('connect...');
+    }
     this.buffer = new PacketWrapper();
     this.socket = net.createConnection({ host: this.host, port: this.port }, () => {
-      this.socket.write(PacketWrapper.encode(Buffer.from(`connect ${this.id} 1.0`)));
+      this.write(`connect ${this.id} 1.0`);
     });
     this.socket.on('error', (e) => {
       // console.error('error', e);
@@ -132,36 +163,42 @@ class MultiplexSocket extends events.EventEmitter {
 
   onData = (chunk: Buffer) => {
     this.buffer.addChunk(chunk);
-    let packet: Buffer;
-    while ((packet = this.buffer.read())) {
-      console.log('receive:', packet.toString());
-      let args = packet.toString().split(' ');
-      let cmd = args[0].toLowerCase();
-      args.shift();
-      switch (cmd) {
-        case 'connected':
-          this._onConnect();
-          break;
-        case 'error':
-          this.retry = 0;
-          this._waitConnect = null;
-          this._onError(new Error(args[0]));
-          break;
-        case 'result':
-          this.onResult(args[0], args[1], args.slice(2).join(' '));
-          break;
-        case 'locked':
-          this.onLocked(args[0]);
-          break;
-        case 'timeout':
-          this.onTimeout(args[0]);
-          break;
-        case 'expired':
-          break;
-        default:
-          console.log('Unkown cmd:', cmd, args.join(' '));
-      }
+    this.onPacket();
+  };
+
+  onPacket = () => {
+    let packet = this.buffer.read();
+    if (!packet) return;
+    if (this.debug) {
+      console.log('received:', packet.toString());
     }
+    let args = packet.toString().split(' ');
+    let cmd = args[0].toLowerCase();
+    args.shift();
+    switch (cmd) {
+      case 'connected':
+        this._onConnect();
+        break;
+      case 'error':
+        this.retry = 0;
+        this._waitConnect = null;
+        this._onError(new Error(args[0]));
+        break;
+      case 'result':
+        this.onResult(args[0], args[1], args.slice(2).join(' '));
+        break;
+      case 'locked':
+        this.onLocked(args[0]);
+        break;
+      case 'timeout':
+        this.onTimeout(args[0]);
+        break;
+      case 'expired':
+        break;
+      default:
+        console.log('Unkown cmd:', cmd, args.join(' '));
+    }
+    setImmediate(this.onPacket);
   };
 
   onResult(requestId: string, success: string, result: string) {
@@ -197,11 +234,11 @@ class MultiplexSocket extends events.EventEmitter {
     callback(new Error('Lock timeout'));
   }
 
-  addClient(client: LockClient) {
+  addClient(client: Client) {
     this.clients.push(client);
   }
 
-  removeClient(client: LockClient) {
+  removeClient(client: Client) {
     let index = this.clients.indexOf(client);
     this.clients.splice(index, 1);
     for (let lockId in this.locks) {
@@ -219,7 +256,9 @@ class MultiplexSocket extends events.EventEmitter {
   }
 
   write(message: string) {
-    console.log('write:', message);
+    if (this.debug) {
+      console.log('write:', message);
+    }
     this.socket.write(PacketWrapper.encode(Buffer.from(message)));
   }
 
@@ -245,7 +284,7 @@ class MultiplexSocket extends events.EventEmitter {
 
   // 调用lock命令，异步返回lock id
   async lock(
-    client: LockClient,
+    client: Client,
     resource: string,
     ttl: number,
     timeout?: number,

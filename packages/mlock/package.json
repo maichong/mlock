@@ -5,7 +5,8 @@
   "author": "Liang <liang@maichong.it> (https://github.com/liangxingchen)",
   "homepage": "https://github.com/maichong/mlock/tree/master/packages/mlock#readme",
   "license": "MIT",
-  "main": "lib/mlock.js",
+  "main": "lib/index.js",
+  "types": "index.d.ts",
   "files": [
     "lib"
   ],

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "outDir": "lib",
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {},
+    "target": "ES2017",
+    "lib": ["es7"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

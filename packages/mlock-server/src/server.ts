@@ -44,7 +44,7 @@ interface Status {
   timeoutCount: number;
   lockedCount: number;
   expiredCount: number;
-  successCount: number;
+  finishedCount: number;
   extendCount: number;
   extendFailedCount: number;
 }
@@ -79,7 +79,7 @@ export default class Server {
       timeoutCount: 0,
       lockedCount: 0,
       expiredCount: 0,
-      successCount: 0,
+      finishedCount: 0,
       extendCount: 0,
       extendFailedCount: 0
     };
@@ -114,7 +114,9 @@ export default class Server {
       console.error(e);
     });
 
-    this.server.listen(options.port);
+    this.server.listen(options.port, () => {
+      console.log('listened on', options.port);
+    });
   }
 
   onMessage(socket: net.Socket, text: String) {
@@ -174,6 +176,8 @@ export default class Server {
       clearTimeout(socket.checkConnectTimer);
       socket.checkConnectTimer = null;
     }
+
+    this.send(socket, ['connected', '1.0']);
 
     let msgTimeout = Date.now() - 2000;
     this.offlineMessages = this.offlineMessages.filter((msg) => {
@@ -267,13 +271,15 @@ export default class Server {
     let lock = this.locks[lockId];
     if (!lock) return this.sendResult(socket, request, false, 'lock not exist!');
 
-    if (!lock.locked) return this.sendResult(socket, request, false, 'not yet locked!');
+    if (!lock.locked) return this.sendResult(socket, request, false, 'not locked yet!');
 
     let ttlNum = parseInt(ttl);
     if (!ttlNum || ttlNum <= 0)
       return this.sendResult(socket, request, false, 'ttl should be integer!');
 
     lock.expiredAt += ttlNum;
+
+    this.sendResult(socket, request, true, lock.expiredAt.toString());
 
     clearTimeout(this.checkTimer);
     this.check();
@@ -311,7 +317,7 @@ export default class Server {
     socket.write(PacketWrapper.encode(Buffer.from(args.join(' '))));
   }
 
-  sendToSocket(socketId: string, args: string[]) {
+  sendToSocket(socketId: string, args: any[]) {
     let socket = this.sockets[socketId];
     if (socket) {
       return this.send(socket, args);
@@ -371,9 +377,10 @@ export default class Server {
         lock.activeCount += 1;
         if (lock.activeCount >= lock.resources.length) {
           // 上锁成功
-          this.sendToSocket(lock.socket, ['locked', lock.lock]);
+          lock.locked = true;
           lock.timeoutAt = 0;
           lock.expiredAt = now + lock.ttl;
+          this.sendToSocket(lock.socket, ['locked', lock.lock, lock.expiredAt]);
 
           this.serverStatus.lockedCount += 1;
         }

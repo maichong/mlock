@@ -6,7 +6,7 @@
   "homepage": "https://github.com/maichong/mlock/tree/master/packages/mlock-server#readme",
   "license": "MIT",
   "bin": {
-    "alaska": "bin/mlock-server"
+    "mlock-server": "bin/mlock-server"
   },
   "main": "lib/index.js",
   "types": "index.d.ts",

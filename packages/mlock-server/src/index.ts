@@ -123,12 +123,20 @@ export default class Server {
 
     return new Promise((resolve, reject) => {
       this.server.on('error', (e) => {
+        if (this.options.debug) {
+          console.error('error', e);
+        }
         let server = this.server;
         this.server = null;
         server.close();
         reject(e);
       });
-      this.server.listen(this.options.port || 12340, resolve);
+      this.server.listen(this.options.port || 12340, () => {
+        if (this.options.port) {
+          console.log('server listened');
+        }
+        resolve();
+      });
     });
   }
 
@@ -141,6 +149,7 @@ export default class Server {
     this.checkTimer = null;
     for (let socketId in this.sockets) {
       let socket = this.sockets[socketId];
+      if (!socket) continue;
       if (socket.checkConnectTimer) {
         clearTimeout(socket.checkConnectTimer);
         socket.checkConnectTimer = null;

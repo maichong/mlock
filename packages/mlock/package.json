@@ -14,7 +14,9 @@
     "type": "git",
     "url": "git+https://github.com/maichong/mlock.git"
   },
-  "scripts": {},
+  "scripts": {
+    "build": "tsc"
+  },
   "bugs": {
     "url": "https://github.com/maichong/mlock/issues"
   },

@@ -100,6 +100,7 @@ class MultiplexSocket extends events.EventEmitter {
   debug: boolean;
   buffer: PacketWrapper;
   socket: net.Socket;
+  connected: boolean;
   _onConnect: () => void;
   _onError: (e: Error) => void;
   _waitConnect: Promise<void>;
@@ -126,25 +127,30 @@ class MultiplexSocket extends events.EventEmitter {
 
   connect(): Promise<void> {
     if (this._waitConnect) return this._waitConnect;
+    if (this.debug) {
+      console.log('connect...');
+    }
     this._waitConnect = new Promise((resolve, reject) => {
       this._onConnect = resolve;
       this._onError = reject;
     });
-    this.retry = 3;
+    this.retry = 10;
     this._connect();
     return this._waitConnect;
   }
 
   _connect() {
     if (this.debug) {
-      console.log('connect...');
+      console.log('do connect...');
     }
     this.buffer = new PacketWrapper();
     this.socket = net.createConnection({ host: this.host, port: this.port }, () => {
       this.write(`connect ${this.id} 1.0`);
     });
     this.socket.on('error', (e) => {
-      // console.error('error', e);
+      if (this.debug) {
+        console.error(e.message);
+      }
       if (!this.retry) {
         this._waitConnect = null;
         this._onError(e);
@@ -152,8 +158,16 @@ class MultiplexSocket extends events.EventEmitter {
     });
     this.socket.on('close', () => {
       // 重新链接
+      let connected = this.connected;
+      this.connected = false;
       if (!this.retry || !this.clients.length) return;
       this.retry -= 1;
+      if (connected) {
+        this._waitConnect = new Promise((resolve, reject) => {
+          this._onConnect = resolve;
+          this._onError = reject;
+        });
+      }
       setTimeout(() => {
         this._connect();
       }, 1000);
@@ -177,6 +191,7 @@ class MultiplexSocket extends events.EventEmitter {
     args.shift();
     switch (cmd) {
       case 'connected':
+        this.connected = true;
         this._onConnect();
         break;
       case 'error':

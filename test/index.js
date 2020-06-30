@@ -1,17 +1,43 @@
 const Server = require('../packages/mlock-server').default;
 const Client = require('../packages/mlock').default;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
-  try {
-    const server = new Server({ debug: true });
+  {
+    console.log('1 -------------------');
+    const port = 12341;
+    const server = new Server({ debug: true, port });
     await server.listen();
-    let client = new Client({ host: 'localhost', debug: true, prefix: 'lock:' });
-    let lockId = await client.lock('goods-1', 5000);
+    let client = new Client({ host: 'localhost', port, debug: true, prefix: 'lock:' });
+    let lockId = await client.lock('goods-1,goods-2', 5000);
     await client.extend(lockId, 1000);
     await client.unlock(lockId);
     client.destroy();
     await server.close();
-  } catch (e) {
-    console.error('connect error:::', e);
+  }
+
+  {
+    console.log('\n2 -------------------');
+    const port = 12342;
+    const server = new Server({ debug: true, port });
+    await server.listen();
+    let client = new Client({ host: 'localhost', port, debug: true, prefix: 'lock:' });
+    let lockId = await client.lock('goods-1,goods-2', 5000);
+    await server.close();
+    await delay(2000);
+    client.extend(lockId, 1000).then(
+      () => {
+        throw new Error('should throw error!');
+      },
+      (error) => {
+        if (error.message !== 'lock not exist!') throw error;
+      }
+    );
+    await delay(5000);
+    await server.listen();
+    await delay(2000);
+    client.destroy();
+    await delay(2000);
+    await server.close();
   }
 })();

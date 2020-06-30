@@ -132,7 +132,7 @@ export default class Server {
         reject(e);
       });
       this.server.listen(this.options.port || 12340, () => {
-        if (this.options.port) {
+        if (this.options.debug) {
           console.log('server listened');
         }
         resolve();

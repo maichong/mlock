@@ -1,5 +1,5 @@
 {
-  "name": "mlock",
+  "name": "mlock-client",
   "version": "0.1.0",
   "description": "Maichong lock client for NodeJs",
   "author": "Liang <liang@maichong.it> (https://github.com/liangxingchen)",
@@ -25,5 +25,6 @@
   },
   "devDependencies": {
     "typescript": "^3.9.5"
-  }
+  },
+  "gitHead": "e6bb1d1372f3fc606c61dcb51c6ebaaf41a490e3"
 }

@@ -1,5 +1,5 @@
 const Server = require('../packages/mlock-server').default;
-const Client = require('../packages/mlock').default;
+const Client = require('../packages/mlock-client').default;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {

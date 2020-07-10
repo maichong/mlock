@@ -1,6 +1,6 @@
 FROM node:14.5.0-alpine3.11
 
-RUN npm install -g mlock-server@0.1.5
+RUN npm install -g mlock-server@0.1.7
 
 CMD mlock-server
 

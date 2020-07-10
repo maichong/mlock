@@ -1,6 +1,6 @@
 {
   "name": "mlock-server",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "description": "Maichong lock server",
   "author": "Liang <liang@maichong.it> (https://github.com/liangxingchen)",
   "homepage": "https://github.com/maichong/mlock/tree/master/packages/mlock-server#readme",

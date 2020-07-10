@@ -8,6 +8,15 @@ const pool: {
   [key: string]: MultiplexSocket;
 } = Object.create(null);
 
+export class MlockError extends Error {
+  type?: string;
+
+  constructor(message: string, type?: string) {
+    super(message);
+    this.type = type;
+  }
+}
+
 export default class Client {
   clientId: string;
   socket: MultiplexSocket;
@@ -47,7 +56,7 @@ export default class Client {
 
     const { host = 'localhost', port, prefix } = this.options;
     if (prefix?.includes('|') || prefix?.includes(' ')) {
-      throw new Error('prefix can not includes "|" or " "');
+      throw new MlockError('prefix can not includes "|" or " "', 'request');
     }
 
     let key = `${host}:${port}`;
@@ -65,7 +74,7 @@ export default class Client {
     if (this.options.debug) {
       console.log(`try to lock ${resource} ttl:${ttl}`);
     }
-    if (resource.includes(' ')) throw new Error('resource can not includes " "');
+    if (resource.includes(' ')) throw new MlockError('resource can not includes " "', 'request');
     await this.socket.connect();
     if (this.options.prefix) {
       if (resource.includes('|')) {
@@ -85,7 +94,7 @@ export default class Client {
     }
     let lockId = await this.socket.lock(this, resource, ttl, timeout, tolerate);
     await new Promise((resolve, reject) => {
-      this.lockCallbacks[lockId] = (error?: Error) => {
+      this.lockCallbacks[lockId] = (error?: MlockError) => {
         delete this.lockCallbacks[lockId];
         error ? reject(error) : resolve();
       };
@@ -175,12 +184,13 @@ class MultiplexSocket extends events.EventEmitter {
     this.socket = net.createConnection({ host: this.host, port: this.port }, () => {
       this.write(`connect ${this.id} 1.0`);
     });
-    this.socket.on('error', (e) => {
+    this.socket.on('error', (e: Error) => {
       if (this.debug) {
         console.error(e.message);
       }
       if (!this.retry) {
         this._waitConnect = null;
+        e = new MlockError(e.message, 'connection');
         this._onError(e);
       }
     });
@@ -225,7 +235,7 @@ class MultiplexSocket extends events.EventEmitter {
       case 'error':
         this.retry = 0;
         this._waitConnect = null;
-        this._onError(new Error(args[0]));
+        this._onError(new MlockError(args[0], 'connection'));
         break;
       case 'result':
         this.onResult(args[0], args[1], args.slice(2).join(' '));
@@ -254,7 +264,11 @@ class MultiplexSocket extends events.EventEmitter {
     if (success === 'success') {
       res = result;
     } else {
-      error = new Error(result);
+      let type = 'request';
+      if (result === 'can not tolerate!') {
+        type = 'tolerate';
+      }
+      error = new MlockError(result, type);
     }
     fn(error, res);
   }
@@ -274,7 +288,7 @@ class MultiplexSocket extends events.EventEmitter {
     delete this.locks[lockId];
     let callback = client.lockCallbacks[lockId];
     if (!callback) return;
-    callback(new Error('Lock timeout'));
+    callback(new MlockError('Lock timeout', 'timeout'));
   }
 
   addClient(client: Client) {

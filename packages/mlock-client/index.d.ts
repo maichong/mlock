@@ -55,3 +55,7 @@ export default class Client {
    */
   unlock(lock: string): Promise<void>;
 }
+
+export class MlockError extends Error {
+  type?: 'connection' | 'request' | 'tolerate' | 'timeout';
+}

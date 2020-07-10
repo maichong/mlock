@@ -235,7 +235,7 @@ class MultiplexSocket extends events.EventEmitter {
       case 'error':
         this.retry = 0;
         this._waitConnect = null;
-        this._onError(new MlockError(args[0], 'connection'));
+        this._onError(new MlockError(args.join(' '), 'connection'));
         break;
       case 'result':
         this.onResult(args[0], args[1], args.slice(2).join(' '));

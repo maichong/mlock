@@ -49,6 +49,20 @@ interface Status {
   extendFailedCount: number;
 }
 
+function objectToText(object: any, indent = 0) {
+  let text = '';
+  for (let key in object) {
+    let value = object[key];
+    if (typeof value === 'object') {
+      text += `${' '.repeat(indent)}${key}:\n`;
+      text += objectToText(value, indent + 2);
+    } else {
+      text += `${' '.repeat(indent)}${key}: ${value}\n`;
+    }
+  }
+  return text;
+}
+
 export default class Server {
   server: net.Server;
   options: ServerOptions;
@@ -96,8 +110,16 @@ export default class Server {
         socket.checkConnectTimer = null;
         this.sendError(socket, 'auth timeout!');
       }, 10000);
-      let buffer = new PacketWrapper();
+      let buffer: PacketWrapper;
       socket.on('data', (chunk) => {
+        if (!buffer) {
+          buffer = new PacketWrapper();
+          let firstCmd = chunk.toString().trim();
+          if (firstCmd === 'status') {
+            socket.end(objectToText(this.getStatus()).trim());
+            return;
+          }
+        }
         if (this.options.debug) {
           console.log(
             `recevied data: ${socket.remoteAddress}:${socket.remotePort} length: ${chunk.length}`
@@ -111,6 +133,11 @@ export default class Server {
       });
 
       socket.on('close', () => {
+        if (socket.checkConnectTimer) {
+          clearTimeout(socket.checkConnectTimer);
+          socket.checkConnectTimer = null;
+        }
+
         if (!this.server) return;
         if (!socket.id) {
           console.log(`disconnected ${socket.remoteAddress}:${socket.remotePort}`);
@@ -238,19 +265,50 @@ export default class Server {
   }
 
   status(socket: net.Socket) {
-    this.send(socket, [
-      'status',
-      JSON.stringify(
-        Object.assign(
-          {
-            socketCount: Object.keys(this.sockets).length,
-            currentLocks: Object.keys(this.locks).length,
-            liveTime: Date.now() - this.serverStatus.startAt
-          },
-          this.serverStatus
-        )
-      )
-    ]);
+    this.send(socket, ['status', JSON.stringify(this.getStatus())]);
+  }
+
+  getStatus() {
+    const now = Date.now();
+    let sockets: any = {};
+    for (let id in this.sockets) {
+      let s = this.sockets[id];
+      if (!s) continue;
+      sockets[id] = `${s.remoteAddress}:${s.remotePort}`;
+    }
+    let queues: any = {};
+    for (let id in this.queues) {
+      let q = this.queues[id];
+      queues[id] = q.length;
+    }
+    let locks: any = {};
+    for (let id in this.locks) {
+      let l = this.locks[id];
+      let item: any = {
+        locked: l.locked,
+        ttl: l.ttl
+      };
+      if (l.locked) {
+        item.expire = l.expiredAt - now;
+      } else {
+        item.timeout = l.timeoutAt - now;
+      }
+      item.resources = Object.keys(l.items).join('|');
+      locks[id] = item;
+    }
+    return Object.assign(
+      {
+        socketCount: Object.keys(this.sockets).length,
+        currentLocks: Object.keys(this.locks).length,
+        liveTime: now - this.serverStatus.startAt
+      },
+      this.serverStatus,
+      {
+        sockets,
+        queues,
+        locks
+      }
+    );
   }
 
   lock(

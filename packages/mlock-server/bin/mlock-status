@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+
+const net = require('net');
+
+process.title = 'mlock-server';
+
+const host = process.argv[2] || 'localhost';
+const port = parseInt(process.argv[3]) || 12340;
+
+const socket = net.createConnection({ host, port });
+
+socket.on('error', console.error);
+socket.on('connect', () => {
+  socket.write('status\n');
+});
+socket.on('data', (buffer) => {
+  console.log(buffer.toString());
+});

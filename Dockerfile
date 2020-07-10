@@ -1,4 +1,4 @@
-FROM maichong/node:12.13.0
+FROM node:14.5.0-alpine3.11
 
 RUN npm install -g mlock-server@0.1.5
 

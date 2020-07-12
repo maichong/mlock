@@ -121,6 +121,14 @@ export default class Client {
     await this.socket.unlock(lockId);
   }
 
+  status(): Promise<any> {
+    return this.socket.status();
+  }
+
+  ping(): Promise<'pong'> {
+    return this.socket.ping() as any;
+  }
+
   destroy() {
     if (this.socket) {
       this.socket.removeClient(this);
@@ -149,6 +157,7 @@ class MultiplexSocket extends events.EventEmitter {
   locks: {
     [lockId: string]: Client;
   };
+  pingTimer?: NodeJS.Timer;
 
   constructor(host: string, port: number, id?: string, debug?: boolean) {
     super();
@@ -198,6 +207,10 @@ class MultiplexSocket extends events.EventEmitter {
       // 重新链接
       let connected = this.connected;
       this.connected = false;
+      if (this.pingTimer) {
+        clearInterval(this.pingTimer);
+        this.pingTimer = null;
+      }
       if (!this.retry || !this.clients.length) return;
       this.retry -= 1;
       if (connected) {
@@ -230,6 +243,9 @@ class MultiplexSocket extends events.EventEmitter {
     switch (cmd) {
       case 'connected':
         this.connected = true;
+        if (!this.pingTimer) {
+          this.pingTimer = setInterval(this.ping, 1000);
+        }
         this._onConnect();
         break;
       case 'error':
@@ -258,6 +274,9 @@ class MultiplexSocket extends events.EventEmitter {
     let fn = this.callbacks[requestId];
     if (!fn) return;
     delete this.callbacks[requestId];
+    if (this.debug) {
+      console.log('Left callbacks count:', Object.keys(this.callbacks).length);
+    }
 
     let error = null;
     let res;
@@ -360,6 +379,15 @@ class MultiplexSocket extends events.EventEmitter {
   unlock(lockId: string) {
     return this.send('unlock', [lockId]);
   }
+
+  async status() {
+    let status = await this.send('status', []);
+    return JSON.parse(status);
+  }
+
+  ping = () => {
+    return this.send('ping', []);
+  };
 }
 
 function generateId() {

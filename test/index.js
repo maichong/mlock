@@ -15,6 +15,11 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     assert(typeof expiredAt === 'number');
     console.log('new expiredAt', expiredAt);
     await client.unlock(lockId);
+    let status = await client.status();
+    console.log('status:', JSON.stringify(status, null, 2));
+    console.log('ping...');
+    console.log(await client.ping());
+    await delay(5000);
     client.destroy();
     await server.close();
   }

@@ -6,6 +6,8 @@ declare module 'net' {
   export interface Socket {
     id: string;
     checkConnectTimer?: any;
+    connectedAt: number;
+    lastLiveAt: number;
   }
 }
 
@@ -106,6 +108,7 @@ export default class Server {
     }
     this.server = net.createServer((socket) => {
       console.log('new conn', `${socket.remoteAddress}:${socket.remotePort}`);
+      socket.connectedAt = Date.now();
       socket.checkConnectTimer = setTimeout(() => {
         socket.checkConnectTimer = null;
         this.sendError(socket, 'auth timeout!');
@@ -193,6 +196,7 @@ export default class Server {
   }
 
   onMessage(socket: net.Socket, text: String) {
+    socket.lastLiveAt = Date.now();
     if (this.options.debug) {
       console.log(`recevied message: ${socket.remoteAddress}:${socket.remotePort} ${text}`);
     }
@@ -220,6 +224,9 @@ export default class Server {
       case 'unlock':
         // @ts-ignore
         this.unlock(...args);
+        return;
+      case 'ping':
+        this.sendResult(socket, args[1], true, 'pong');
         return;
       default:
         this.sendError(socket, 'invalid message!');
@@ -264,17 +271,17 @@ export default class Server {
     });
   }
 
-  status(socket: net.Socket) {
-    this.send(socket, ['status', JSON.stringify(this.getStatus())]);
-  }
-
   getStatus() {
     const now = Date.now();
     let sockets: any = {};
     for (let id in this.sockets) {
       let s = this.sockets[id];
       if (!s) continue;
-      sockets[id] = `${s.remoteAddress}:${s.remotePort}`;
+      sockets[id] = {
+        address: `${s.remoteAddress}:${s.remotePort}`,
+        liveTime: now - s.connectedAt,
+        lastLive: now - s.lastLiveAt
+      };
     }
     let queues: any = {};
     for (let id in this.queues) {
@@ -309,6 +316,14 @@ export default class Server {
         locks
       }
     );
+  }
+
+  status(socket: net.Socket, request: string) {
+    let status = this.getStatus();
+    this.sendResult(socket, request, true, JSON.stringify(status));
+    if (this.options.debug) {
+      console.log(objectToText(status));
+    }
   }
 
   lock(
@@ -396,6 +411,7 @@ export default class Server {
     let lock = this.locks[lockId];
     if (!lock) return this.sendResult(socket, request, false, 'lock not exist!');
     delete this.locks[lockId];
+    this.serverStatus.finishedCount += 1;
 
     for (let rid in lock.items) {
       removeItem(this.queues[rid], lock.items[rid]);

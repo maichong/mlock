@@ -54,6 +54,16 @@ export default class Client {
    * 解锁
    */
   unlock(lock: string): Promise<void>;
+
+  /**
+   * ping
+   */
+  ping(): Promise<'pong'>;
+
+  /**
+   * 获取服务器状态
+   */
+  status(): Promise<any>;
 }
 
 export class MlockError extends Error {

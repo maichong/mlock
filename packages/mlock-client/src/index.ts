@@ -96,7 +96,7 @@ export default class Client {
     await new Promise((resolve, reject) => {
       this.lockCallbacks[lockId] = (error?: MlockError) => {
         delete this.lockCallbacks[lockId];
-        error ? reject(error) : resolve();
+        error ? reject(error) : resolve(null);
       };
     });
     return lockId;

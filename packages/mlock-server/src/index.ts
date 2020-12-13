@@ -65,6 +65,10 @@ function objectToText(object: any, indent = 0) {
   return text;
 }
 
+process.on('uncaughtException', function (err) {
+  console.error('uncaughtException', err.stack);
+});
+
 export default class Server {
   server: net.Server;
   options: ServerOptions;

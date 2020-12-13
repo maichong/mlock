@@ -149,6 +149,13 @@ export default class Server {
         this.sockets[socket.id] = null;
         console.log(`disconnected ${socket.remoteAddress}:${socket.remotePort} ${socket.id}`);
       });
+
+      socket.on('error', (error) => {
+        console.error(`${socket.remoteAddress}:${socket.remotePort}`, error);
+        if (!socket.destroyed) {
+          socket.destroy();
+        }
+      });
     });
 
     return new Promise((resolve, reject) => {
@@ -165,7 +172,7 @@ export default class Server {
         if (this.options.debug) {
           console.log('server listened');
         }
-        resolve();
+        resolve(null);
       });
     });
   }
@@ -191,7 +198,7 @@ export default class Server {
     this.locks = Object.create(null);
     this.offlineMessages = [];
     return new Promise((resolve, reject) => {
-      server.close((e) => (e ? reject(e) : resolve()));
+      server.close((e) => (e ? reject(e) : resolve(null)));
     });
   }
 
@@ -437,6 +444,7 @@ export default class Server {
   }
 
   send(socket: net.Socket, args: string[]) {
+    if (socket.destroyed || socket.writableEnded) return;
     if (this.options.debug) {
       console.log(`send: ${socket.remoteAddress}:${socket.remotePort} ${args.join(' ')}`);
     }

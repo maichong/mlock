@@ -244,7 +244,7 @@ class MultiplexSocket extends events.EventEmitter {
       case 'connected':
         this.connected = true;
         if (!this.pingTimer) {
-          this.pingTimer = setInterval(this.ping, 1000);
+          this.pingTimer = setInterval(this.ping, 20000);
         }
         this._onConnect();
         break;
